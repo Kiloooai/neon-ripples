@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Ripples</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+            background: radial-gradient(ellipse at center, #0a0015 0%, #000000 100%);
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 12px;
+            color: #0ff;
+            text-shadow: 0 0 8px #0ff;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            backdrop-filter: blur(5px);
+            user-select: none;
+            z-index: 100;
+            max-width: 260px;
+        }
+
+        .controls h2 {
+            margin-bottom: 12px;
+            font-size: 16px;
+            color: #f0f;
+            text-shadow: 0 0 10px #f0f;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 10px;
+            margin-bottom: 4px;
+            color: #ff0;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #0ff;
+        }
+
+        select {
+            width: 100%;
+            background: #000;
+            color: #0ff;
+            border: 1px solid #0ff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 6px;
+            background: transparent;
+            border: 1px solid #0ff;
+            color: #0ff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            margin-top: 5px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .value-display {
+            float: right;
+            color: #fff;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #0f0;
+            text-shadow: 0 0 8px #0f0;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        #custom-cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #0ff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #0ff;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <h2>🌊 NEON RIPPLES</h2>
+
+        <div class="control-group">
+            <label>Damping <span class="value-display" id="dampVal">0.98</span></label>
+            <input type="range" id="damping" min="0.9" max="0.99" step="0.01" value="0.98">
+        </div>
+
+        <div class="control-group">
+            <label>Wave Speed <span class="value-display" id="speedVal">2.0</span></label>
+            <input type="range" id="waveSpeed" min="0.5" max="5" step="0.1" value="2">
+        </div>
+
+        <div class="control-group">
+            <label>Max Radius <span class="value-display" id="maxRadVal">200</span></label>
+            <input type="range" id="maxRadius" min="100" max="400" value="200">
+        </div>
+
+        <div class="control-group">
+            <label>Line Width <span class="value-display" id="widthVal">2</span></label>
+            <input type="range" id="lineWidth" min="1" max="6" value="2">
+        </div>
+
+        <div class="control-group">
+            <label>Color Scheme</label>
+            <select id="colorScheme">
+                <option value="cyan">Cyan Plasma</option>
+                <option value="magenta">Magenta Flare</option>
+                <option value="gold">Gold Shock</option>
+                <option value="rainbow">Rainbow Wheel</option>
+                <option value="matrix">Matrix Code</option>
+            </select>
+        </div>
+
+        <button id="clearBtn">Clear All Ripples</button>
+        <button id="autoBtn">Auto Mode: OFF</button>
+    </div>
+
+    <div class="stats">
+        <div>Ripples: <span id="rippleCount">0</span></div>
+        <div>FPS: <span id="fps">60</span></div>
+    </div>
+
+    <div class="instructions">
+        Move mouse to create gentle ripples • Click for big waves • Right-click to clear
+    </div>
+
+    <div id="custom-cursor"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const customCursor = document.getElementById('custom-cursor');
+
+        const dampingSlider = document.getElementById('damping');
+        const waveSpeedSlider = document.getElementById('waveSpeed');
+        const maxRadiusSlider = document.getElementById('maxRadius');
+        const lineWidthSlider = document.getElementById('lineWidth');
+        const colorSchemeSelect = document.getElementById('colorScheme');
+        const clearBtn = document.getElementById('clearBtn');
+        const autoBtn = document.getElementById('autoBtn');
+
+        let ripples = [];
+        let mouseX = 0, mouseY = 0;
+        let lastTime = 0;
+        let fps = 60;
+        let autoMode = false;
+        let autoInterval;
+
+        const colorSchemes = {
+            cyan: ['#00ffff', '#00cccc', '#00aaaa', '#00ffcc'],
+            magenta: ['#ff00ff', '#cc00cc', '#aa00aa', '#ff88ff'],
+            gold: ['#ffd700', '#ffec8b', '#ffa500', '#ffff00'],
+            rainbow: ['#ff0000', '#ff8800', '#ffff00', '#00ff00', '#00ffff', '#0088ff', '#ff00ff'],
+            matrix: ['#00ff00', '#00cc00', '#00aa00', '#00ff88', '#88ff88']
+        };
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        class Ripple {
+            constructor(x, y, big = false) {
+                this.x = x;
+                this.y = y;
+                this.radius = 0;
+                this.maxRadius = parseInt(maxRadiusSlider.value) * (big ? 2 : 1);
+                this.speed = parseFloat(waveSpeedSlider.value);
+                this.alpha = 1;
+                this.lineWidth = parseInt(lineWidthSlider.value);
+                this.color = this.pickColor();
+                this.alive = true;
+            }
+
+            pickColor() {
+                const scheme = colorSchemeSelect.value;
+                const palette = colorSchemes[scheme];
+                return palette[Math.floor(Math.random() * palette.length)];
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.alpha *= parseFloat(dampingSlider.value);
+
+                // Fade based on radius progress
+                const progress = this.radius / this.maxRadius;
+                this.currentAlpha = this.alpha * (1 - progress);
+
+                if (this.alpha < 0.01 || this.radius >= this.maxRadius) {
+                    this.alive = false;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = this.color.replace(')', `, ${this.currentAlpha})`).replace('rgb', 'rgba').replace('#', ''); // quick fix
+                // Actually easier: use globalAlpha
+                ctx.globalAlpha = this.currentAlpha;
+                ctx.lineWidth = this.lineWidth;
+                ctx.strokeStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function createRipple(x, y, big = false) {
+            ripples.push(new Ripple(x, y, big));
+        }
+
+        function animate(timestamp) {
+            const deltaTime = timestamp - lastTime || 16;
+            lastTime = timestamp;
+            fps = Math.round(1000 / deltaTime);
+            document.getElementById('fps').textContent = fps;
+
+            // Gentle fade background for motion blur
+            ctx.fillStyle = 'rgba(10, 0, 21, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw ripples
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                ripples[i].update();
+                ripples[i].draw();
+                if (!ripples[i].alive) {
+                    ripples.splice(i, 1);
+                }
+            }
+
+            document.getElementById('rippleCount').textContent = ripples.length;
+
+            requestAnimationFrame(animate);
+        }
+
+        // Mouse tracking
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            customCursor.style.left = mouseX + 'px';
+            customCursor.style.top = mouseY + 'px';
+
+            // Create small ripples on movement (throttle)
+            if (Math.random() < 0.1) { // not every frame
+                createRipple(mouseX, mouseY);
+            }
+        });
+
+        // Click for big ripple
+        canvas.addEventListener('click', (e) => {
+            createRipple(e.clientX, e.clientY, true);
+        });
+
+        // Right-click to clear
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            ripples = [];
+        });
+
+        // Control listeners
+        function updateDisplays() {
+            document.getElementById('dampVal').textContent = dampingSlider.value;
+            document.getElementById('speedVal').textContent = waveSpeedSlider.value;
+            document.getElementById('maxRadVal').textContent = maxRadiusSlider.value;
+            document.getElementById('widthVal').textContent = lineWidthSlider.value;
+        }
+
+        [dampingSlider, waveSpeedSlider, maxRadiusSlider, lineWidthSlider].forEach(slider => {
+            slider.addEventListener('input', updateDisplays);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            ripples = [];
+        });
+
+        autoBtn.addEventListener('click', () => {
+            autoMode = !autoMode;
+            autoBtn.textContent = autoMode ? 'Auto Mode: ON' : 'Auto Mode: OFF';
+            if (autoMode) {
+                autoInterval = setInterval(() => {
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+                    createRipple(x, y, Math.random() < 0.3);
+                }, 300);
+            } else {
+                clearInterval(autoInterval);
+            }
+        });
+
+        updateDisplays();
+        animate(0);
+    </script>
+</body>
+</html>
